@@ -158,4 +158,60 @@ router.get('/status/:roomId/:deviceId', async (req, res) => {
   }
 });
 
+// 미처리 친구 요청 목록 조회
+router.get('/pending/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // 만료된 요청 정리
+    await FriendRequest.cleanupExpiredRequests();
+
+    // 미처리 요청 조회
+    const pendingRequests = await FriendRequest.getPendingRequests(userId);
+
+    res.json({
+      success: true,
+      data: pendingRequests,
+      count: pendingRequests.length
+    });
+
+  } catch (error) {
+    console.error('❌ 미처리 친구 요청 조회 실패:', error);
+    res.status(500).json({
+      success: false,
+      message: '미처리 친구 요청 조회 중 오류가 발생했습니다.',
+      error: error.message
+    });
+  }
+});
+
+// 친구 요청 처리됨 표시
+router.post('/mark-processed', async (req, res) => {
+  try {
+    const { requestId } = req.body;
+
+    if (!requestId) {
+      return res.status(400).json({
+        success: false,
+        message: '요청 ID가 필요합니다.'
+      });
+    }
+
+    const request = await FriendRequest.markAsProcessed(requestId);
+
+    res.json({
+      success: true,
+      data: request
+    });
+
+  } catch (error) {
+    console.error('❌ 친구 요청 처리 표시 실패:', error);
+    res.status(500).json({
+      success: false,
+      message: '친구 요청 처리 표시 중 오류가 발생했습니다.',
+      error: error.message
+    });
+  }
+});
+
 module.exports = router;

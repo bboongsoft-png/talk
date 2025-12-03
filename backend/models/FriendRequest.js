@@ -32,6 +32,16 @@ const friendRequestSchema = new mongoose.Schema({
   },
   respondedAt: {
     type: Date
+  },
+  expiresAt: {
+    type: Date,
+    default: function() {
+      return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7일 후 만료
+    }
+  },
+  isProcessed: {
+    type: Boolean,
+    default: false
   }
 });
 
@@ -120,6 +130,39 @@ friendRequestSchema.statics.getRoomRequestStatus = async function(roomId, userId
     sentRequest,
     receivedRequest
   };
+};
+
+// 사용자의 미처리 친구 요청 목록 조회
+friendRequestSchema.statics.getPendingRequests = async function(userId) {
+  const pendingRequests = await this.find({
+    receiverUserId: userId,
+    status: 'pending',
+    expiresAt: { $gt: new Date() } // 만료되지 않은 것만
+  }).sort({ createdAt: -1 });
+  
+  console.log(`📋 ${userId}의 미처리 친구 요청: ${pendingRequests.length}개`);
+  
+  return pendingRequests;
+};
+
+// 만료된 요청 정리
+friendRequestSchema.statics.cleanupExpiredRequests = async function() {
+  const result = await this.deleteMany({
+    status: 'pending',
+    expiresAt: { $lt: new Date() }
+  });
+  
+  console.log(`🗑️ 만료된 친구 요청 ${result.deletedCount}개 정리 완료`);
+  return result;
+};
+
+// 요청을 처리됨으로 표시
+friendRequestSchema.statics.markAsProcessed = async function(requestId) {
+  return await this.findByIdAndUpdate(
+    requestId,
+    { isProcessed: true },
+    { new: true }
+  );
 };
 
 module.exports = mongoose.model('FriendRequest', friendRequestSchema);
